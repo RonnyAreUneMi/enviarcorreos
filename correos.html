@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envío de Certificados por Email</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- PDF-Lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- SheetJS para leer Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- JSZip para manejar archivos comprimidos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-pink-100 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <i data-lucide="mail" class="text-purple-600" style="width: 36px; height: 36px;"></i>
+                Envío Automático de Certificados por Email
+            </h1>
+            <p class="text-gray-600 mb-6">
+                Sube tus certificados (PDF, RAR, ZIP o carpeta) y tu Excel con los correos, y envía cada certificado automáticamente
+            </p>
+
+            <!-- Upload Areas -->
+            <div class="grid md:grid-cols-2 gap-4 mb-4">
+                <!-- PDF Upload -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i data-lucide="file-text" class="inline" style="width: 16px; height: 16px;"></i>
+                        1. Cargar Certificados (PDF, RAR, ZIP o Carpeta)
+                    </label>
+                    <div id="pdfUploadArea" class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-purple-300 rounded-lg cursor-pointer bg-purple-50 hover:bg-purple-100 transition-colors">
+                        <i data-lucide="upload" class="text-purple-500 mb-2" style="width: 32px; height: 32px;"></i>
+                        <p class="text-sm text-gray-600" id="pdfFileName">Click para cargar archivos o arrastra aquí</p>
+                        <p class="text-xs text-gray-500 mt-1">Soporta: PDF único, múltiples PDFs, RAR, ZIP o carpetas</p>
+                        <input type="file" id="pdfInput" class="hidden" accept=".pdf,.rar,.zip" multiple webkitdirectory="false">
+                    </div>
+                    <div class="mt-2 flex gap-2">
+                        <button type="button" onclick="selectFiles()" class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200">Archivos</button>
+                        <button type="button" onclick="selectFolder()" class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200">Carpeta</button>
+                    </div>
+                </div>
+
+                <!-- Excel Upload -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i data-lucide="table" class="inline" style="width: 16px; height: 16px;"></i>
+                        2. Cargar Excel con Correos
+                    </label>
+                    <div id="excelUploadArea" class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-green-300 rounded-lg cursor-pointer bg-green-50 hover:bg-green-100 transition-colors">
+                        <i data-lucide="upload" class="text-green-500 mb-2" style="width: 32px; height: 32px;"></i>
+                        <p class="text-sm text-gray-600" id="excelFileName">Click para cargar Excel</p>
+                        <input type="file" id="excelInput" class="hidden" accept=".xlsx,.xls,.csv">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Template de correo -->
+            <div class="mt-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i data-lucide="mail-open" class="inline" style="width: 16px; height: 16px;"></i>
+                    3. Personalizar mensaje del correo
+                </label>
+                <div class="mb-3">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" id="embedCertificate" class="rounded">
+                        <span class="text-sm text-gray-700">Incluir certificado como imagen en el cuerpo del correo</span>
+                    </label>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4 mb-3">
+                    <input type="text" id="emailSubject" placeholder="Asunto del correo" 
+                           value="MUC- FEUE RECONOCE TU LIDERAZGO EN EL PERIODO 2S-2025"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <textarea id="emailBody" rows="12" 
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="Escribe el cuerpo del mensaje (usa {nombre_completo} para insertar el nombre completo)">Estimado/a {nombre_completo}
+
+Me complace enormemente dirigirme a ti para expresar mi más sincero reconocimiento por las labores excepcionales que has desempeñado como presidente/a de nuestro curso. Tu dedicación y esfuerzo no han pasado desapercibidos y hoy, el MOVIMIENTO UNIVERSITARIO POR EL CAMBIO – MUC y la FEDERACIÓN FEUE-UNEMI le felicita merecidamente por este logro.
+
+Tu capacidad para liderar, motivar y colaborar con nuestros compañeros ha sido extraordinaria. Has demostrado un compromiso continuo con la excelencia, sirviendo como un ejemplo inspirador para todos nosotros. Tu pasión y habilidad para guiar al grupo son fundamentales para el éxito conjunto.
+
+Este reconocimiento es un testimonio de tu talento innato y de la constante búsqueda de la excelencia en tu papel como líder estudiantil. Te animo a seguir con ese mismo entusiasmo y dedicación en todas tus futuras empresas.
+
+Como muestra adicional de aprecio, te invito a seguirnos en nuestras redes sociales para mantenerte informado sobre noticias y eventos:
+
+INSTAGRAM: https://instagram.com/unemimuc?igshid=MW91bjdjcDE3YmY1ZQ==
+FACEBOOK FEUE: https://www.facebook.com/FederaciondeUnemi?mibextid=PzaGJu
+FACEBOOK MUC: https://www.facebook.com/muc.jose.9?mibextid=PzaGJu
+
+Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y gracias por ser un líder ejemplar!</textarea>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center py-12 bg-white rounded-xl shadow-lg mb-6">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+            <p class="text-gray-600">Procesando archivos...</p>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <p class="text-blue-800 font-semibold flex items-center gap-2">
+                <i data-lucide="info" style="width: 20px; height: 20px;"></i>
+                <span id="statusText"></span>
+            </p>
+        </div>
+
+        <!-- Table -->
+        <div id="tableContainer" class="hidden bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i data-lucide="list" style="width: 24px; height: 24px;"></i>
+                    Lista de Certificados y Destinatarios
+                </h2>
+                <button onclick="enviarTodos()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors flex items-center gap-2 font-semibold">
+                    <i data-lucide="send" style="width: 20px; height: 20px;"></i>
+                    Enviar Todos los Correos
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Certificado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfFiles = [];
+        let excelData = [];
+        let certificados = [];
+        let matchedData = [];
+
+        function initIcons() {
+            lucide.createIcons();
+        }
+
+        // Setup PDF upload
+        const pdfUploadArea = document.getElementById('pdfUploadArea');
+        const pdfInput = document.getElementById('pdfInput');
+
+        // Drag and drop support
+        pdfUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            pdfUploadArea.classList.add('border-purple-500', 'bg-purple-200');
+        });
+
+        pdfUploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            pdfUploadArea.classList.remove('border-purple-500', 'bg-purple-200');
+        });
+
+        pdfUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            pdfUploadArea.classList.remove('border-purple-500', 'bg-purple-200');
+            const files = Array.from(e.dataTransfer.files);
+            handleFileSelection(files);
+        });
+
+        pdfInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFileSelection(files);
+        });
+
+        function selectFiles() {
+            pdfInput.removeAttribute('webkitdirectory');
+            pdfInput.multiple = true;
+            pdfInput.click();
+        }
+
+        function selectFolder() {
+            pdfInput.setAttribute('webkitdirectory', '');
+            pdfInput.multiple = true;
+            pdfInput.click();
+        }
+
+        async function handleFileSelection(files) {
+            if (files.length === 0) return;
+
+            pdfFiles = [];
+            certificados = [];
+            
+            document.getElementById('pdfFileName').textContent = `Procesando ${files.length} archivo(s)...`;
+            
+            for (let file of files) {
+                try {
+                    if (file.name.toLowerCase().endsWith('.pdf')) {
+                        pdfFiles.push(file);
+                    } else if (file.name.toLowerCase().endsWith('.rar') || file.name.toLowerCase().endsWith('.zip')) {
+                        await extractCompressedFile(file);
+                    }
+                } catch (error) {
+                    console.warn(`Error procesando ${file.name}:`, error);
+                    // Continuar con otros archivos
+                }
+            }
+
+            if (pdfFiles.length > 0) {
+                document.getElementById('pdfFileName').textContent = `${pdfFiles.length} PDF(s) cargados`;
+                await processAllPDFs();
+            } else {
+                alert('No se encontraron archivos PDF válidos');
+            }
+        }
+
+        async function extractCompressedFile(file) {
+            try {
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(file);
+                
+                for (let filename in contents.files) {
+                    const zipEntry = contents.files[filename];
+                    if (!zipEntry.dir && filename.toLowerCase().endsWith('.pdf')) {
+                        try {
+                            const pdfBlob = await zipEntry.async('blob');
+                            const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+                            pdfFiles.push(pdfFile);
+                        } catch (error) {
+                            console.warn(`Error extrayendo ${filename}:`, error);
+                            // Continuar con otros archivos
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn(`Error procesando archivo comprimido ${file.name}:`, error);
+                throw error;
+            }
+        }
+
+        // Setup Excel upload
+        const excelUploadArea = document.getElementById('excelUploadArea');
+        const excelInput = document.getElementById('excelInput');
+
+        excelUploadArea.addEventListener('click', () => excelInput.click());
+        excelInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('excelFileName').textContent = file.name;
+                processExcel(file);
+            }
+        });
+
+        function extractNameFromText(text) {
+            const lines = text.split('\n');
+            for (let line of lines) {
+                line = line.trim();
+                if (line && !line.includes('Por su destacado') && !line.includes('PRESIDENTE') 
+                    && !line.includes('REPRESENTANTE') && !line.includes('MILAGRO')
+                    && !line.includes('ROXANA') && !line.includes('PAOLA')
+                    && !line.includes('FEUE') && !line.includes('OCS')
+                    && line.length > 5 && line.length < 60) {
+                    const cleanName = line.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+                    const words = cleanName.split(' ').filter(w => w.length > 0);
+                    if (words.length >= 2 && words.length <= 6) {
+                        return cleanName;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function formatFileName(fullName) {
+            if (!fullName) return 'certificado';
+            const nameParts = fullName.split(' ').filter(p => p.length > 0);
+            if (nameParts.length < 2) return 'certificado';
+            const firstName = nameParts[0].toLowerCase();
+            const lastName = nameParts[nameParts.length - 2].toLowerCase();
+            const cleanFirstName = firstName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const cleanLastName = lastName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return `certificado_${cleanFirstName}${cleanLastName}`;
+        }
+
+        async function processAllPDFs() {
+            showLoading(true);
+            showStatus('Procesando archivos PDF...');
+            certificados = [];
+
+            try {
+                for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
+                    const pdfFile = pdfFiles[fileIndex];
+                    showStatus(`Procesando ${pdfFile.name} (${fileIndex + 1}/${pdfFiles.length})...`);
+                    
+                    try {
+                        const arrayBuffer = await pdfFile.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        const totalPages = pdf.numPages;
+
+                        for (let i = 1; i <= totalPages; i++) {
+                            try {
+                                const page = await pdf.getPage(i);
+                                const textContent = await page.getTextContent();
+                                const text = textContent.items.map(item => item.str).join('\n');
+                                const fullName = extractNameFromText(text);
+                                
+                                certificados.push({
+                                    fileIndex: fileIndex,
+                                    pageNum: i,
+                                    fullName: fullName || 'Nombre no detectado',
+                                    fileName: formatFileName(fullName),
+                                    sourceFile: pdfFile.name
+                                });
+                            } catch (pageError) {
+                                console.warn(`Error procesando página ${i} de ${pdfFile.name}:`, pageError);
+                                // Continuar con la siguiente página
+                            }
+                        }
+                    } catch (fileError) {
+                        console.warn(`Error procesando archivo ${pdfFile.name}:`, fileError);
+                        // Continuar con el siguiente archivo
+                    }
+                }
+
+                showStatus(`Procesamiento completado: ${certificados.length} certificados encontrados`);
+                checkAndMatch();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar los PDFs: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function processExcel(file) {
+            showLoading(true);
+            showStatus('Procesando archivo Excel...');
+
+            try {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Obtener todos los datos como array
+                const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                console.log('📊 Datos del Excel (primeras 5 filas):', rawData.slice(0, 5));
+                
+                // Buscar automáticamente las columnas
+                let nameCol = -1, emailCol = -1, dataStartRow = 0;
+                
+                // Analizar las primeras filas para encontrar patrones
+                for (let rowIdx = 0; rowIdx < Math.min(10, rawData.length); rowIdx++) {
+                    const row = rawData[rowIdx];
+                    if (!Array.isArray(row)) continue;
+                    
+                    for (let colIdx = 0; colIdx < row.length; colIdx++) {
+                        const cell = String(row[colIdx] || '').toLowerCase().trim();
+                        
+                        // Detectar columna de nombres
+                        if (nameCol === -1 && (
+                            cell.includes('nombre') || cell.includes('name') || 
+                            cell.includes('apellido') || cell.includes('estudiante') ||
+                            cell.includes('alumno') || cell.includes('persona')
+                        )) {
+                            nameCol = colIdx;
+                            dataStartRow = rowIdx + 1;
+                        }
+                        
+                        // Detectar columna de emails
+                        if (emailCol === -1 && (
+                            cell.includes('correo') || cell.includes('email') || 
+                            cell.includes('mail') || cell.includes('@') ||
+                            cell.includes('e-mail')
+                        )) {
+                            emailCol = colIdx;
+                            dataStartRow = rowIdx + 1;
+                        }
+                    }
+                    
+                    if (nameCol >= 0 && emailCol >= 0) break;
+                }
+                
+                console.log(`🔍 Columnas detectadas - Nombres: ${nameCol}, Emails: ${emailCol}, Datos desde fila: ${dataStartRow}`);
+                
+                // Si no encontró por encabezados, buscar por contenido
+                if (nameCol === -1 || emailCol === -1) {
+                    console.log('🔄 Buscando por contenido...');
+                    
+                    for (let rowIdx = 0; rowIdx < Math.min(10, rawData.length); rowIdx++) {
+                        const row = rawData[rowIdx];
+                        if (!Array.isArray(row)) continue;
+                        
+                        for (let colIdx = 0; colIdx < row.length; colIdx++) {
+                            const cell = String(row[colIdx] || '').trim();
+                            
+                            // Detectar email por formato
+                            if (emailCol === -1 && cell.includes('@') && cell.includes('.')) {
+                                emailCol = colIdx;
+                                dataStartRow = Math.max(0, rowIdx);
+                            }
+                            
+                            // Detectar nombre por longitud y formato
+                            if (nameCol === -1 && cell.length > 5 && cell.length < 50 && 
+                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(cell) && 
+                                cell.split(' ').length >= 2) {
+                                nameCol = colIdx;
+                                dataStartRow = Math.max(0, rowIdx);
+                            }
+                        }
+                        
+                        if (nameCol >= 0 && emailCol >= 0) break;
+                    }
+                }
+                
+                console.log(`✅ Columnas finales - Nombres: ${nameCol}, Emails: ${emailCol}`);
+                
+                // Extraer los datos
+                excelData = [];
+                
+                if (nameCol >= 0 && emailCol >= 0) {
+                    for (let i = dataStartRow; i < rawData.length; i++) {
+                        const row = rawData[i];
+                        if (Array.isArray(row)) {
+                            const nombre = String(row[nameCol] || '').trim();
+                            const correo = String(row[emailCol] || '').trim();
+                            
+                            if (nombre && correo && correo.includes('@')) {
+                                excelData.push({ nombre, correo });
+                            }
+                        }
+                    }
+                } else {
+                    // Último intento: usar todas las columnas
+                    console.log('🆘 Último intento con todas las columnas...');
+                    const objData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    for (let row of objData) {
+                        let nombre = '', correo = '';
+                        
+                        for (let [key, value] of Object.entries(row)) {
+                            const val = String(value || '').trim();
+                            
+                            if (!correo && val.includes('@') && val.includes('.')) {
+                                correo = val;
+                            }
+                            
+                            if (!nombre && val.length > 5 && val.length < 50 && 
+                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(val) && 
+                                val.split(' ').length >= 2) {
+                                nombre = val;
+                            }
+                        }
+                        
+                        if (nombre && correo) {
+                            excelData.push({ nombre, correo });
+                        }
+                    }
+                }
+                
+                console.log('📋 Datos extraídos:', excelData.slice(0, 3));
+                
+                if (excelData.length === 0) {
+                    alert('❌ No se pudieron extraer datos del Excel.\n\nAsegúrate de que el archivo tenga:\n• Una columna con nombres completos\n• Una columna con correos electrónicos');
+                } else {
+                    showStatus(`Excel procesado: ${excelData.length} contactos encontrados`);
+                }
+                
+                checkAndMatch();
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert('Error al procesar el Excel: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function normalizeName(name) {
+            return name.toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z\s]/g, "")
+                .trim();
+        }
+
+        function findBestMatch(certName, excelContacts) {
+            const normalizedCert = normalizeName(certName);
+            const certWords = normalizedCert.split(/\s+/);
+
+            for (let contact of excelContacts) {
+                const normalizedContact = normalizeName(contact.nombre);
+                const contactWords = normalizedContact.split(/\s+/);
+
+                // Buscar coincidencias de al menos 2 palabras
+                let matches = 0;
+                for (let word of certWords) {
+                    if (word.length > 2 && contactWords.some(cw => cw.includes(word) || word.includes(cw))) {
+                        matches++;
+                    }
+                }
+
+                if (matches >= 2) {
+                    return contact;
+                }
+            }
+            return null;
+        }
+
+        function checkAndMatch() {
+            if (certificados.length === 0) return;
+
+            if (excelData.length === 0) {
+                // Mostrar todos los certificados sin correos
+                matchedData = certificados.map(cert => ({
+                    ...cert,
+                    correo: '',
+                    nombreExcel: '',
+                    estado: 'Sin Excel'
+                }));
+                
+                renderTable();
+                document.getElementById('tableContainer').classList.remove('hidden');
+                showStatus(`📋 ${certificados.length} certificados encontrados. Carga el Excel para asignar correos.`);
+                return;
+            }
+
+            // Hacer matching con Excel
+            matchedData = certificados.map(cert => {
+                const match = findBestMatch(cert.fullName, excelData);
+                return {
+                    ...cert,
+                    correo: match ? match.correo : '',
+                    nombreExcel: match ? match.nombre : '',
+                    estado: match ? 'Listo' : 'Sin correo'
+                };
+            });
+
+            const withEmail = matchedData.filter(item => item.correo !== '');
+            
+            renderTable();
+            document.getElementById('tableContainer').classList.remove('hidden');
+            
+            if (withEmail.length === 0) {
+                showStatus('⚠️ No se encontraron coincidencias entre los certificados y el Excel');
+            } else {
+                showStatus(`✅ ${withEmail.length} de ${matchedData.length} certificados listos para enviar`);
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            matchedData.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 font-medium">${item.fullName}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${item.correo}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        <code class="bg-gray-100 px-2 py-1 rounded">${item.fileName}.pdf</code>
+                        <div class="text-xs text-gray-400 mt-1">${item.sourceFile}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                            item.estado === 'Listo' ? 'bg-green-100 text-green-800' :
+                            item.estado === 'Sin correo' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                        }">
+                            ${item.estado}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button onclick="enviarCorreo(${index})" 
+                                ${item.correo ? '' : 'disabled'}
+                                class="px-3 py-2 ${item.correo ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400 cursor-not-allowed'} text-white rounded transition-colors flex items-center gap-1">
+                            <i data-lucide="send" style="width: 16px; height: 16px;"></i>
+                            Enviar
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+
+            initIcons();
+        }
+
+        async function enviarCorreo(index) {
+            const item = matchedData[index];
+            if (!item.correo) return;
+
+            try {
+                showLoading(true);
+                showStatus('Preparando correo...');
+                
+                // Generar el PDF individual
+                const sourceFile = pdfFiles[item.fileIndex];
+                const arrayBuffer = await sourceFile.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const newPdf = await PDFLib.PDFDocument.create();
+                const [copiedPage] = await newPdf.copyPages(pdfDoc, [item.pageNum - 1]);
+                newPdf.addPage(copiedPage);
+                const pdfBytes = await newPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+                // Preparar el mensaje
+                const asunto = document.getElementById('emailSubject').value;
+                let cuerpoTemplate = document.getElementById('emailBody').value;
+                let cuerpo = cuerpoTemplate.replace('{nombre_completo}', item.fullName);
+                
+                const embedCert = document.getElementById('embedCertificate').checked;
+                
+                if (embedCert) {
+                    showStatus('Convirtiendo certificado a imagen...');
+                    
+                    // Convertir PDF a imagen usando PDF.js
+                    const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    // Convertir canvas a base64
+                    const imageDataUrl = canvas.toDataURL('image/png', 0.8);
+                    
+                    // Crear HTML con imagen embebida
+                    const htmlBody = `
+                        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                            ${cuerpo.replace(/\n/g, '<br>')}
+                            <br><br>
+                            <div style="text-align: center; margin: 20px 0;">
+                                <p style="font-weight: bold; margin-bottom: 10px;">Tu Certificado:</p>
+                                <img src="${imageDataUrl}" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" alt="Certificado">
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Crear mailto con HTML
+                    const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.correo)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(htmlBody)}`;
+                    
+                    window.open(mailtoLink, '_blank');
+                    
+                    setTimeout(() => {
+                        alert('✅ Gmail abierto con certificado incluido en el cuerpo.\n\n💡 Nota: Gmail convertirá automáticamente el HTML.');
+                    }, 500);
+                    
+                } else {
+                    // Método original - solo adjunto
+                    const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.correo)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+                    
+                    window.open(mailtoLink, '_blank');
+                    
+                    // Descargar PDF para adjuntar
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${item.fileName}.pdf`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+
+                    setTimeout(() => {
+                        alert('✅ Gmail abierto y PDF descargado.\n\n📎 Arrastra el PDF descargado al correo para adjuntarlo.');
+                    }, 500);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al preparar el correo: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function enviarTodos() {
+            const confirmacion = confirm(`¿Deseas enviar correos a ${matchedData.filter(m => m.correo).length} destinatarios?\n\nSe abrirá una pestaña de Gmail para cada uno.`);
+            if (!confirmacion) return;
+
+            for (let i = 0; i < matchedData.length; i++) {
+                if (matchedData[i].correo) {
+                    await enviarCorreo(i);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        function showStatus(text) {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('status').classList.remove('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', initIcons);
+    </script>
+</body>
+</html>
