@@ -402,155 +402,157 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
             try {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                // Obtener todos los datos como array
-                const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                // Probar todas las hojas del Excel
+                let bestSheet = null;
+                let bestEmailCount = 0;
+                
+                for (let sheetName of workbook.SheetNames) {
+                    const sheet = workbook.Sheets[sheetName];
+                    const testData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                    
+                    let emailCount = 0;
+                    for (let row of testData.slice(0, 100)) {
+                        if (Array.isArray(row)) {
+                            for (let cell of row) {
+                                const cellStr = String(cell || '').trim();
+                                if (cellStr.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cellStr)) {
+                                    emailCount++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (emailCount > bestEmailCount) {
+                        bestEmailCount = emailCount;
+                        bestSheet = sheet;
+                    }
+                }
+                
+                const rawData = XLSX.utils.sheet_to_json(bestSheet || workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
                 console.log('📊 Datos del Excel (primeras 5 filas):', rawData.slice(0, 5));
+                console.log(`📋 Usando hoja con ${bestEmailCount} emails detectados`);
                 
                 // Mostrar debugging detallado
                 debugExcelStructure(rawData);
                 
-                // Buscar automáticamente las columnas
-                let nameCol = -1, emailCol = -1, dataStartRow = 0;
+                // CONFIGURACIÓN FIJA: Columna 3 = Nombres, Columna 5 = Correos
+                let nameCol = 2;  // Columna 3 (índice 2)
+                let emailCol = 4; // Columna 5 (índice 4)
+                let dataStartRow = 0;
                 
-                // Analizar las primeras filas para encontrar patrones
-                for (let rowIdx = 0; rowIdx < Math.min(15, rawData.length); rowIdx++) {
-                    const row = rawData[rowIdx];
-                    if (!Array.isArray(row)) continue;
-                    
-                    for (let colIdx = 0; colIdx < row.length; colIdx++) {
-                        const cell = String(row[colIdx] || '').toLowerCase().trim();
-                        
-                        // Detectar columna de nombres (más patrones)
-                        if (nameCol === -1 && (
-                            cell.includes('nombre') || cell.includes('name') || 
-                            cell.includes('apellido') || cell.includes('estudiante') ||
-                            cell.includes('alumno') || cell.includes('persona') ||
-                            cell.includes('participante') || cell.includes('beneficiario') ||
-                            cell.includes('destinatario') || cell.includes('usuario')
-                        )) {
-                            nameCol = colIdx;
-                            dataStartRow = rowIdx + 1;
-                            console.log(`🎯 Columna de nombres encontrada en posición ${colIdx} con encabezado: "${cell}"`);
+                console.log('🎯 USANDO CONFIGURACIÓN FIJA:');
+                console.log(`📧 Columna de emails: ${emailCol + 1} (índice ${emailCol})`);
+                console.log(`👤 Columna de nombres: ${nameCol + 1} (índice ${nameCol})`);
+                
+                // Verificar que las columnas existen y tienen datos
+                let emailsFound = 0;
+                let namesFound = 0;
+                
+                for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                    const row = rawData[i];
+                    if (Array.isArray(row)) {
+                        // Verificar email en columna 5
+                        if (row[emailCol]) {
+                            const email = String(row[emailCol]).trim();
+                            if (email.includes('@') && /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(email)) {
+                                emailsFound++;
+                            }
                         }
                         
-                        // Detectar columna de emails (más patrones y flexible)
-                        if (emailCol === -1 && (
-                            cell.includes('correo') || cell.includes('email') || 
-                            cell.includes('mail') || cell.includes('@') ||
-                            cell.includes('e-mail') || cell.includes('electronico') ||
-                            cell.includes('gmail') || cell.includes('hotmail') ||
-                            cell.includes('yahoo') || cell.includes('outlook') ||
-                            /correo.*electronico/i.test(cell) ||
-                            /email.*address/i.test(cell) ||
-                            /direccion.*correo/i.test(cell)
-                        )) {
-                            emailCol = colIdx;
-                            dataStartRow = rowIdx + 1;
-                            console.log(`📧 Columna de correos encontrada en posición ${colIdx} con encabezado: "${cell}"`);
+                        // Verificar nombre en columna 3
+                        if (row[nameCol]) {
+                            const name = String(row[nameCol]).trim();
+                            if (name.length > 3 && name.split(' ').length >= 2) {
+                                namesFound++;
+                            }
                         }
                     }
-                    
-                    if (nameCol >= 0 && emailCol >= 0) break;
                 }
                 
-                console.log(`🔍 Columnas detectadas - Nombres: ${nameCol}, Emails: ${emailCol}, Datos desde fila: ${dataStartRow}`);
+                console.log(`✅ Verificación: ${emailsFound} emails válidos, ${namesFound} nombres válidos encontrados`);
                 
-                // Si no encontró por encabezados, buscar por contenido
-                if (nameCol === -1 || emailCol === -1) {
-                    console.log('🔄 Buscando por contenido en las primeras 20 filas...');
+                // Si no hay datos en las columnas fijas, intentar detección automática
+                if (emailsFound === 0 || namesFound === 0) {
+                    console.log('⚠️ Columnas fijas no tienen datos, intentando detección automática...');
                     
-                    // Analizar más filas para encontrar patrones de contenido
-                    for (let rowIdx = 0; rowIdx < Math.min(20, rawData.length); rowIdx++) {
+                    const emailCounts = {};
+                    const nameCounts = {};
+                    
+                    // Buscar en todas las columnas
+                    for (let rowIdx = 0; rowIdx < rawData.length; rowIdx++) {
                         const row = rawData[rowIdx];
                         if (!Array.isArray(row)) continue;
                         
                         for (let colIdx = 0; colIdx < row.length; colIdx++) {
                             const cell = String(row[colIdx] || '').trim();
                             
-                            // Detectar email por formato más estricto
-                            if (emailCol === -1 && cell.includes('@') && cell.includes('.') && 
-                                /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cell)) {
-                                emailCol = colIdx;
-                                dataStartRow = Math.max(0, rowIdx);
-                                console.log(`📧 Email encontrado por contenido en columna ${colIdx}: "${cell}"`);
+                            // Contar emails
+                            if (cell.includes('@') && /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(cell)) {
+                                emailCounts[colIdx] = (emailCounts[colIdx] || 0) + 1;
                             }
                             
-                            // Detectar nombre por longitud y formato mejorado
-                            if (nameCol === -1 && cell.length > 5 && cell.length < 60 && 
-                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.]+$/.test(cell) && 
-                                cell.split(' ').filter(w => w.length > 1).length >= 2) {
-                                nameCol = colIdx;
-                                dataStartRow = Math.max(0, rowIdx);
-                                console.log(`👤 Nombre encontrado por contenido en columna ${colIdx}: "${cell}"`);
-                            }
-                        }
-                        
-                        if (nameCol >= 0 && emailCol >= 0) break;
-                    }
-                    
-                    // Búsqueda adicional: analizar frecuencia de emails por columna
-                    if (emailCol === -1) {
-                        console.log('🔍 Analizando frecuencia de emails por columna...');
-                        const emailCounts = {};
-                        
-                        for (let rowIdx = 0; rowIdx < Math.min(50, rawData.length); rowIdx++) {
-                            const row = rawData[rowIdx];
-                            if (!Array.isArray(row)) continue;
-                            
-                            for (let colIdx = 0; colIdx < row.length; colIdx++) {
-                                const cell = String(row[colIdx] || '').trim();
-                                if (cell.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cell)) {
-                                    emailCounts[colIdx] = (emailCounts[colIdx] || 0) + 1;
+                            // Contar nombres (evitar facultades)
+                            if (cell.length > 3 && cell.length < 80 && 
+                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.'-]+$/.test(cell)) {
+                                const words = cell.split(/\s+/).filter(w => w.length > 1);
+                                const cellLower = cell.toLowerCase();
+                                const isFacultad = cellLower.includes('facultad') || cellLower.includes('ingenieria') || 
+                                                 cellLower.includes('medicina') || cellLower.includes('derecho');
+                                
+                                if (words.length >= 2 && words.length <= 6 && !isFacultad) {
+                                    nameCounts[colIdx] = (nameCounts[colIdx] || 0) + 1;
                                 }
                             }
                         }
-                        
-                        // Encontrar la columna con más emails
-                        let maxEmails = 0;
-                        for (let [colIdx, count] of Object.entries(emailCounts)) {
-                            if (count > maxEmails) {
-                                maxEmails = count;
-                                emailCol = parseInt(colIdx);
-                                dataStartRow = 0;
-                            }
-                        }
-                        
-                        if (emailCol >= 0) {
-                            console.log(`📧 Columna de emails detectada por frecuencia: ${emailCol} (${maxEmails} emails encontrados)`);
+                    }
+                    
+                    // Usar las mejores columnas encontradas
+                    let maxEmails = 0, maxNames = 0;
+                    for (let [col, count] of Object.entries(emailCounts)) {
+                        if (count > maxEmails) {
+                            maxEmails = count;
+                            emailCol = parseInt(col);
                         }
                     }
+                    for (let [col, count] of Object.entries(nameCounts)) {
+                        if (count > maxNames && col != emailCol) {
+                            maxNames = count;
+                            nameCol = parseInt(col);
+                        }
+                    }
+                    
+                    console.log(`🔄 Detección automática: emails col ${emailCol + 1}, nombres col ${nameCol + 1}`);
                 }
                 
-                console.log(`✅ Columnas finales - Nombres: ${nameCol}, Emails: ${emailCol}`);
+                console.log(`✅ Columnas finales - Nombres: ${nameCol + 1}, Emails: ${emailCol + 1}`);
                 
-                // Extraer los datos
+                // EXTRACCIÓN DIRECTA
                 excelData = [];
                 
-                if (nameCol >= 0 && emailCol >= 0) {
-                    console.log(`📊 Extrayendo datos desde la fila ${dataStartRow}...`);
+                if (emailCol >= 0 && nameCol >= 0) {
+                    console.log(`📊 Extrayendo datos de columnas fijas...`);
                     
-                    for (let i = dataStartRow; i < rawData.length; i++) {
+                    for (let i = 0; i < rawData.length; i++) {
                         const row = rawData[i];
-                        if (Array.isArray(row)) {
-                            const nombre = String(row[nameCol] || '').trim();
+                        if (Array.isArray(row) && row.length > Math.max(emailCol, nameCol)) {
                             const correo = String(row[emailCol] || '').trim().toLowerCase();
+                            const nombre = String(row[nameCol] || '').trim();
                             
-                            // Validación más estricta del email
-                            if (nombre && correo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+                            // Validar email y nombre
+                            if (correo && /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(correo) &&
+                                nombre && nombre.length > 2) {
                                 excelData.push({ nombre, correo });
-                            } else if (nombre && correo) {
-                                console.log(`⚠️ Fila ${i+1} descartada - Nombre: "${nombre}", Email inválido: "${correo}"`);
+                                console.log(`✅ Fila ${i+1}: "${nombre}" -> ${correo}`);
                             }
                         }
                     }
                     
-                    console.log(`✅ ${excelData.length} registros válidos extraídos`);
+                    console.log(`✅ ${excelData.length} registros extraídos`);
                 } else {
-                    // Último intento: usar todas las columnas
-                    console.log('🆘 Último intento con todas las columnas...');
-                    const objData = XLSX.utils.sheet_to_json(firstSheet);
+                    // ÚLTIMO RECURSO: Análisis objeto por objeto
+                    console.log('🆘 ÚLTIMO RECURSO: Analizando como objetos...');
+                    const objData = XLSX.utils.sheet_to_json(bestSheet || workbook.Sheets[workbook.SheetNames[0]]);
                     
                     for (let row of objData) {
                         let nombre = '', correo = '';
@@ -558,37 +560,63 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                         for (let [key, value] of Object.entries(row)) {
                             const val = String(value || '').trim();
                             
-                            if (!correo && val.includes('@') && val.includes('.')) {
-                                correo = val;
+                            // Buscar email con validación flexible
+                            if (!correo && val.includes('@') && /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(val)) {
+                                correo = val.toLowerCase();
                             }
                             
-                            if (!nombre && val.length > 5 && val.length < 50 && 
-                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(val) && 
-                                val.split(' ').length >= 2) {
-                                nombre = val;
+                            // Buscar nombre (MEJORADO)
+                            if (!nombre && val.length > 3 && val.length < 80 && 
+                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.'-]+$/.test(val)) {
+                                
+                                const words = val.split(/\s+/).filter(w => w.length > 1);
+                                
+                                // Verificar que NO sea facultad
+                                const facultadWords = ['facultad', 'ingenieria', 'medicina', 'derecho', 'administracion', 
+                                    'economia', 'educacion', 'psicologia', 'arquitectura', 'comunicacion', 'sistemas'];
+                                
+                                const valLower = val.toLowerCase();
+                                const isFacultad = facultadWords.some(fw => valLower.includes(fw));
+                                
+                                if (words.length >= 2 && words.length <= 6 && !isFacultad) {
+                                    const hasNameWord = words.some(w => 
+                                        w.length >= 3 && 
+                                        /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+$/.test(w) &&
+                                        !['DE', 'LA', 'DEL', 'LOS', 'LAS', 'Y', 'E'].includes(w.toUpperCase())
+                                    );
+                                    
+                                    if (hasNameWord) {
+                                        nombre = val;
+                                    }
+                                }
                             }
                         }
                         
-                        if (nombre && correo) {
+                        if (correo) {
+                            if (!nombre) {
+                                nombre = correo.split('@')[0].replace(/[._-]/g, ' ');
+                            }
                             excelData.push({ nombre, correo });
                         }
                     }
+                    
+                    console.log(`🔄 Método objeto extrajo: ${excelData.length} registros`);
                 }
                 
                 console.log('📋 Datos extraídos:', excelData.slice(0, 3));
                 
                 if (excelData.length === 0) {
-                    const mensaje = `❌ No se pudieron extraer datos del Excel.\n\n` +
-                        `Columnas detectadas:\n` +
-                        `• Nombres: ${nameCol >= 0 ? `Columna ${nameCol + 1}` : 'No encontrada'}\n` +
-                        `• Emails: ${emailCol >= 0 ? `Columna ${emailCol + 1}` : 'No encontrada'}\n\n` +
-                        `Asegúrate de que el archivo tenga:\n` +
-                        `• Una columna con nombres completos\n` +
-                        `• Una columna con correos electrónicos válidos\n` +
-                        `• Los encabezados contengan palabras como "nombre", "correo", "email", etc.`;
+                    const mensaje = `❌ NO SE ENCONTRARON DATOS VÁLIDOS\n\n` +
+                        `Configuración usada:\n` +
+                        `• Nombres: Columna ${nameCol + 1}\n` +
+                        `• Emails: Columna ${emailCol + 1}\n\n` +
+                        `Verifica que:\n` +
+                        `• La columna 3 tenga nombres\n` +
+                        `• La columna 5 tenga emails válidos\n` +
+                        `• Revisa la consola (F12) para más detalles`;
                     alert(mensaje);
                 } else {
-                    showStatus(`Excel procesado: ${excelData.length} contactos encontrados (Nombres: col ${nameCol + 1}, Emails: col ${emailCol + 1})`);
+                    showStatus(`✅ Excel procesado: ${excelData.length} contactos (Nombres: col ${nameCol + 1}, Emails: col ${emailCol + 1})`);
                 }
                 
                 // Mostrar resumen de detección
