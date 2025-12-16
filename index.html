@@ -349,6 +349,52 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
             }
         }
 
+        function debugExcelStructure(rawData) {
+            console.log('\n🔍 DEBUGGING ESTRUCTURA DEL EXCEL:');
+            console.log('Total de filas:', rawData.length);
+            
+            // Mostrar las primeras 10 filas con índices
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+                const row = rawData[i];
+                if (Array.isArray(row)) {
+                    console.log(`Fila ${i}:`, row.map((cell, idx) => `[${idx}]"${cell}"`).join(' | '));
+                }
+            }
+            
+            // Analizar cada columna
+            const maxCols = Math.max(...rawData.filter(r => Array.isArray(r)).map(r => r.length));
+            console.log('\n📈 ANÁLISIS POR COLUMNAS:');
+            
+            for (let col = 0; col < maxCols; col++) {
+                const columnData = [];
+                let emailCount = 0;
+                let nameCount = 0;
+                
+                for (let row = 0; row < Math.min(20, rawData.length); row++) {
+                    if (Array.isArray(rawData[row]) && rawData[row][col]) {
+                        const cell = String(rawData[row][col]).trim();
+                        columnData.push(cell);
+                        
+                        if (cell.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cell)) {
+                            emailCount++;
+                        }
+                        
+                        if (cell.length > 5 && cell.length < 60 && 
+                            /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.]+$/.test(cell) && 
+                            cell.split(' ').filter(w => w.length > 1).length >= 2) {
+                            nameCount++;
+                        }
+                    }
+                }
+                
+                if (columnData.length > 0) {
+                    console.log(`Columna ${col}: ${emailCount} emails, ${nameCount} nombres posibles`);
+                    console.log(`  Muestra:`, columnData.slice(0, 3));
+                }
+            }
+            console.log('\n');
+        }
+
         async function processExcel(file) {
             showLoading(true);
             showStatus('Procesando archivo Excel...');
@@ -362,35 +408,47 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                 const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
                 console.log('📊 Datos del Excel (primeras 5 filas):', rawData.slice(0, 5));
                 
+                // Mostrar debugging detallado
+                debugExcelStructure(rawData);
+                
                 // Buscar automáticamente las columnas
                 let nameCol = -1, emailCol = -1, dataStartRow = 0;
                 
                 // Analizar las primeras filas para encontrar patrones
-                for (let rowIdx = 0; rowIdx < Math.min(10, rawData.length); rowIdx++) {
+                for (let rowIdx = 0; rowIdx < Math.min(15, rawData.length); rowIdx++) {
                     const row = rawData[rowIdx];
                     if (!Array.isArray(row)) continue;
                     
                     for (let colIdx = 0; colIdx < row.length; colIdx++) {
                         const cell = String(row[colIdx] || '').toLowerCase().trim();
                         
-                        // Detectar columna de nombres
+                        // Detectar columna de nombres (más patrones)
                         if (nameCol === -1 && (
                             cell.includes('nombre') || cell.includes('name') || 
                             cell.includes('apellido') || cell.includes('estudiante') ||
-                            cell.includes('alumno') || cell.includes('persona')
+                            cell.includes('alumno') || cell.includes('persona') ||
+                            cell.includes('participante') || cell.includes('beneficiario') ||
+                            cell.includes('destinatario') || cell.includes('usuario')
                         )) {
                             nameCol = colIdx;
                             dataStartRow = rowIdx + 1;
+                            console.log(`🎯 Columna de nombres encontrada en posición ${colIdx} con encabezado: "${cell}"`);
                         }
                         
-                        // Detectar columna de emails
+                        // Detectar columna de emails (más patrones y flexible)
                         if (emailCol === -1 && (
                             cell.includes('correo') || cell.includes('email') || 
                             cell.includes('mail') || cell.includes('@') ||
-                            cell.includes('e-mail')
+                            cell.includes('e-mail') || cell.includes('electronico') ||
+                            cell.includes('gmail') || cell.includes('hotmail') ||
+                            cell.includes('yahoo') || cell.includes('outlook') ||
+                            /correo.*electronico/i.test(cell) ||
+                            /email.*address/i.test(cell) ||
+                            /direccion.*correo/i.test(cell)
                         )) {
                             emailCol = colIdx;
                             dataStartRow = rowIdx + 1;
+                            console.log(`📧 Columna de correos encontrada en posición ${colIdx} con encabezado: "${cell}"`);
                         }
                     }
                     
@@ -401,31 +459,67 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                 
                 // Si no encontró por encabezados, buscar por contenido
                 if (nameCol === -1 || emailCol === -1) {
-                    console.log('🔄 Buscando por contenido...');
+                    console.log('🔄 Buscando por contenido en las primeras 20 filas...');
                     
-                    for (let rowIdx = 0; rowIdx < Math.min(10, rawData.length); rowIdx++) {
+                    // Analizar más filas para encontrar patrones de contenido
+                    for (let rowIdx = 0; rowIdx < Math.min(20, rawData.length); rowIdx++) {
                         const row = rawData[rowIdx];
                         if (!Array.isArray(row)) continue;
                         
                         for (let colIdx = 0; colIdx < row.length; colIdx++) {
                             const cell = String(row[colIdx] || '').trim();
                             
-                            // Detectar email por formato
-                            if (emailCol === -1 && cell.includes('@') && cell.includes('.')) {
+                            // Detectar email por formato más estricto
+                            if (emailCol === -1 && cell.includes('@') && cell.includes('.') && 
+                                /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cell)) {
                                 emailCol = colIdx;
                                 dataStartRow = Math.max(0, rowIdx);
+                                console.log(`📧 Email encontrado por contenido en columna ${colIdx}: "${cell}"`);
                             }
                             
-                            // Detectar nombre por longitud y formato
-                            if (nameCol === -1 && cell.length > 5 && cell.length < 50 && 
-                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(cell) && 
-                                cell.split(' ').length >= 2) {
+                            // Detectar nombre por longitud y formato mejorado
+                            if (nameCol === -1 && cell.length > 5 && cell.length < 60 && 
+                                /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\.]+$/.test(cell) && 
+                                cell.split(' ').filter(w => w.length > 1).length >= 2) {
                                 nameCol = colIdx;
                                 dataStartRow = Math.max(0, rowIdx);
+                                console.log(`👤 Nombre encontrado por contenido en columna ${colIdx}: "${cell}"`);
                             }
                         }
                         
                         if (nameCol >= 0 && emailCol >= 0) break;
+                    }
+                    
+                    // Búsqueda adicional: analizar frecuencia de emails por columna
+                    if (emailCol === -1) {
+                        console.log('🔍 Analizando frecuencia de emails por columna...');
+                        const emailCounts = {};
+                        
+                        for (let rowIdx = 0; rowIdx < Math.min(50, rawData.length); rowIdx++) {
+                            const row = rawData[rowIdx];
+                            if (!Array.isArray(row)) continue;
+                            
+                            for (let colIdx = 0; colIdx < row.length; colIdx++) {
+                                const cell = String(row[colIdx] || '').trim();
+                                if (cell.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cell)) {
+                                    emailCounts[colIdx] = (emailCounts[colIdx] || 0) + 1;
+                                }
+                            }
+                        }
+                        
+                        // Encontrar la columna con más emails
+                        let maxEmails = 0;
+                        for (let [colIdx, count] of Object.entries(emailCounts)) {
+                            if (count > maxEmails) {
+                                maxEmails = count;
+                                emailCol = parseInt(colIdx);
+                                dataStartRow = 0;
+                            }
+                        }
+                        
+                        if (emailCol >= 0) {
+                            console.log(`📧 Columna de emails detectada por frecuencia: ${emailCol} (${maxEmails} emails encontrados)`);
+                        }
                     }
                 }
                 
@@ -435,17 +529,24 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                 excelData = [];
                 
                 if (nameCol >= 0 && emailCol >= 0) {
+                    console.log(`📊 Extrayendo datos desde la fila ${dataStartRow}...`);
+                    
                     for (let i = dataStartRow; i < rawData.length; i++) {
                         const row = rawData[i];
                         if (Array.isArray(row)) {
                             const nombre = String(row[nameCol] || '').trim();
-                            const correo = String(row[emailCol] || '').trim();
+                            const correo = String(row[emailCol] || '').trim().toLowerCase();
                             
-                            if (nombre && correo && correo.includes('@')) {
+                            // Validación más estricta del email
+                            if (nombre && correo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
                                 excelData.push({ nombre, correo });
+                            } else if (nombre && correo) {
+                                console.log(`⚠️ Fila ${i+1} descartada - Nombre: "${nombre}", Email inválido: "${correo}"`);
                             }
                         }
                     }
+                    
+                    console.log(`✅ ${excelData.length} registros válidos extraídos`);
                 } else {
                     // Último intento: usar todas las columnas
                     console.log('🆘 Último intento con todas las columnas...');
@@ -477,10 +578,21 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                 console.log('📋 Datos extraídos:', excelData.slice(0, 3));
                 
                 if (excelData.length === 0) {
-                    alert('❌ No se pudieron extraer datos del Excel.\n\nAsegúrate de que el archivo tenga:\n• Una columna con nombres completos\n• Una columna con correos electrónicos');
+                    const mensaje = `❌ No se pudieron extraer datos del Excel.\n\n` +
+                        `Columnas detectadas:\n` +
+                        `• Nombres: ${nameCol >= 0 ? `Columna ${nameCol + 1}` : 'No encontrada'}\n` +
+                        `• Emails: ${emailCol >= 0 ? `Columna ${emailCol + 1}` : 'No encontrada'}\n\n` +
+                        `Asegúrate de que el archivo tenga:\n` +
+                        `• Una columna con nombres completos\n` +
+                        `• Una columna con correos electrónicos válidos\n` +
+                        `• Los encabezados contengan palabras como "nombre", "correo", "email", etc.`;
+                    alert(mensaje);
                 } else {
-                    showStatus(`Excel procesado: ${excelData.length} contactos encontrados`);
+                    showStatus(`Excel procesado: ${excelData.length} contactos encontrados (Nombres: col ${nameCol + 1}, Emails: col ${emailCol + 1})`);
                 }
+                
+                // Mostrar resumen de detección
+                showDetectionSummary(nameCol, emailCol, excelData.length, rawData.length);
                 
                 checkAndMatch();
             } catch (error) {
@@ -489,6 +601,20 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
             } finally {
                 showLoading(false);
             }
+        }
+        
+        function showDetectionSummary(nameCol, emailCol, validRecords, totalRows) {
+            const summary = `
+📄 RESUMEN DE DETECCIÓN DEL EXCEL:
+• Total de filas: ${totalRows}
+• Columna de nombres: ${nameCol >= 0 ? `${nameCol + 1} (✅ detectada)` : '❌ No detectada'}
+• Columna de emails: ${emailCol >= 0 ? `${emailCol + 1} (✅ detectada)` : '❌ No detectada'}
+• Registros válidos: ${validRecords}
+
+${nameCol === -1 || emailCol === -1 ? '⚠️ SUGERENCIAS PARA MEJORAR LA DETECCIÓN:\n• Asegúrate de que los encabezados contengan palabras como "nombre", "correo", "email"\n• Verifica que los emails tengan formato válido (ejemplo@dominio.com)\n• Revisa que no haya filas vacías al inicio' : '✅ Detección exitosa!'}
+            `;
+            
+            console.log(summary);
         }
 
         function normalizeName(name) {
@@ -501,25 +627,55 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
 
         function findBestMatch(certName, excelContacts) {
             const normalizedCert = normalizeName(certName);
-            const certWords = normalizedCert.split(/\s+/);
+            const certWords = normalizedCert.split(/\s+/).filter(w => w.length > 2);
+            
+            let bestMatch = null;
+            let bestScore = 0;
 
             for (let contact of excelContacts) {
                 const normalizedContact = normalizeName(contact.nombre);
-                const contactWords = normalizedContact.split(/\s+/);
-
-                // Buscar coincidencias de al menos 2 palabras
-                let matches = 0;
-                for (let word of certWords) {
-                    if (word.length > 2 && contactWords.some(cw => cw.includes(word) || word.includes(cw))) {
-                        matches++;
+                const contactWords = normalizedContact.split(/\s+/).filter(w => w.length > 2);
+                
+                let score = 0;
+                let exactMatches = 0;
+                let partialMatches = 0;
+                
+                // Buscar coincidencias exactas y parciales
+                for (let certWord of certWords) {
+                    for (let contactWord of contactWords) {
+                        if (certWord === contactWord) {
+                            exactMatches++;
+                            score += 3; // Peso alto para coincidencias exactas
+                        } else if (certWord.length > 3 && contactWord.length > 3) {
+                            if (certWord.includes(contactWord) || contactWord.includes(certWord)) {
+                                partialMatches++;
+                                score += 1; // Peso menor para coincidencias parciales
+                            }
+                        }
                     }
                 }
-
-                if (matches >= 2) {
-                    return contact;
+                
+                // Criterios de matching más flexibles
+                const isGoodMatch = (
+                    exactMatches >= 2 || // Al menos 2 palabras exactas
+                    (exactMatches >= 1 && partialMatches >= 1) || // 1 exacta + 1 parcial
+                    (exactMatches >= 1 && certWords.length <= 3) // 1 exacta si el nombre es corto
+                );
+                
+                if (isGoodMatch && score > bestScore) {
+                    bestScore = score;
+                    bestMatch = contact;
                 }
             }
-            return null;
+            
+            // Log para debugging
+            if (bestMatch) {
+                console.log(`✅ Match encontrado: "${certName}" -> "${bestMatch.nombre}" (score: ${bestScore})`);
+            } else {
+                console.log(`❌ Sin match para: "${certName}"`);
+            }
+            
+            return bestMatch;
         }
 
         function checkAndMatch() {
@@ -540,8 +696,13 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
                 return;
             }
 
+            console.log('\n🔄 INICIANDO PROCESO DE MATCHING...');
+            console.log(`Certificados a procesar: ${certificados.length}`);
+            console.log(`Contactos en Excel: ${excelData.length}`);
+            
             // Hacer matching con Excel
-            matchedData = certificados.map(cert => {
+            matchedData = certificados.map((cert, index) => {
+                console.log(`\nProcesando certificado ${index + 1}: "${cert.fullName}"`);
                 const match = findBestMatch(cert.fullName, excelData);
                 return {
                     ...cert,
@@ -552,12 +713,22 @@ Una vez más, ¡enhorabuena por tu destacada labor como presidente/a de curso y 
             });
 
             const withEmail = matchedData.filter(item => item.correo !== '');
+            const withoutEmail = matchedData.filter(item => item.correo === '');
+            
+            console.log(`\n📈 RESULTADOS DEL MATCHING:`);
+            console.log(`✅ Con email: ${withEmail.length}`);
+            console.log(`❌ Sin email: ${withoutEmail.length}`);
+            
+            if (withoutEmail.length > 0) {
+                console.log('\n🔍 Certificados sin match:');
+                withoutEmail.forEach(cert => console.log(`  - "${cert.fullName}"`));
+            }
             
             renderTable();
             document.getElementById('tableContainer').classList.remove('hidden');
             
             if (withEmail.length === 0) {
-                showStatus('⚠️ No se encontraron coincidencias entre los certificados y el Excel');
+                showStatus('⚠️ No se encontraron coincidencias entre los certificados y el Excel. Revisa la consola para más detalles.');
             } else {
                 showStatus(`✅ ${withEmail.length} de ${matchedData.length} certificados listos para enviar`);
             }
